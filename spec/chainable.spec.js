@@ -40,3 +40,6 @@ myApi
     console.log('// myApi', myApi)
     done()
   })
+  .chains.repeatIf(function (p) {
+    return true
+  }, 1)

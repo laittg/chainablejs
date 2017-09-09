@@ -140,8 +140,12 @@ function Chainable (settings) {
       if (err) tasks = []
       else tasks.splice(0, 1)
 
-      if (!err && tasks.length > 0) exec(done)
-      else if (typeof done === 'function') done(errors, results)
+      if (!err && tasks.length > 0) {
+        exec(done)
+      } else {
+        executing = false
+        if (typeof done === 'function') done(errors, results)
+      }
     })
   }
 }
