@@ -47,7 +47,7 @@ function Chainable (settings) {
     if (typeof methodName !== 'string') throw new Error('Method name must be a string')
 
     // check reserved keyword
-    if (methodName === api) throw new Error('Reserved keyword: ' + methodName)
+    if (methodName === api || methodName === 'then') throw new Error('Reserved keyword: ' + methodName)
 
     // check if fn is an async function
     if (typeof fn !== 'function') throw new Error('Second argument must be an async function')
@@ -126,9 +126,9 @@ function Chainable (settings) {
       errors = []
       results = []
       exec(done)
-    }/*  else if (typeof done === 'function') {
+    } else if (typeof done === 'function') {
       done('Executing...')
-    } */
+    }
   }
 
   // execute tasks[0](), then slice item [0], loop until tasks[] empty or an err returned
@@ -167,5 +167,5 @@ function asyncFnCheck (fn) {
   var lastparam = params[params.length - 1]
   var cb = new RegExp(lastparam + '\\s*\\(')
   if (cb.test(src)) return true
-  else throw new Error(lastparam + ' should be a callback, but is not called anywhere inside this function\n\n' + fn.toString())
+  else throw new Error(lastparam + ' is expected to be a callback, but is not called anywhere inside this function\n\n' + fn.toString())
 }
