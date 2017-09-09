@@ -1,0 +1,20 @@
+{
+  "name": "chainable",
+  "version": "1.0.0",
+  "description": "Create chainable methods",
+  "main": "chainable.js",
+  "scripts": {
+    "test": "jasmine"
+  },
+  "keywords": [
+    "chainable methods",
+    "chainable api"
+  ],
+  "standard": {
+    "env": [
+      "jasmine"
+    ]
+  },
+  "author": "Trung, Lai Thanh @laittg",
+  "license": "MIT"
+}
