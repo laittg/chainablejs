@@ -1,7 +1,7 @@
 const Chainable = require('../chainable.js')
 
 var myApi = new Chainable({
-  manualExec: true,
+  manualExec: false,
   chainable: 'chains'
 })
 
@@ -23,13 +23,20 @@ myApi.chains.add('study', function (topic, time, done) {
 })
 
 myApi
-  .think('AI', 3000)
-  .study('AI', 2000)
-  .think('Big Data', 1000)
-  .study('Big Data', 3000)
-
-myApi.chains.exec(function (errors, results) {
-  console.log(errors)
-  console.log(results)
-  console.log('// myApi', myApi)
-})
+  .think('AI', 500)
+  .study('AI', 1000)
+  .think('Big Data', 500)
+  .study('Big Data', 1000)
+  .then(function (name, age, location, done) {
+    setTimeout(function () {
+      console.log(myApi.chains.lastResult())
+      console.log(name, age, location)
+      done(null, {message: 'this is then', id: [10010, 11323, 19338]})
+    }, 1500)
+  }, 'New', 10010, 'York')
+  .then(function (done) {
+    console.log(myApi.chains.errors())
+    console.log(myApi.chains.results())
+    console.log('// myApi', myApi)
+    done()
+  })

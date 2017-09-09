@@ -49,10 +49,9 @@ function Chainable (settings) {
     // check reserved keyword
     if (methodName === api) throw new Error('Reserved keyword: ' + methodName)
 
-    // check if fn is a function
+    // check if fn is an async function
     if (typeof fn !== 'function') throw new Error('Second argument must be an async function')
-
-    // TODO: check if there's a done() callback inside fn()
+    asyncFnCheck(fn)
 
     // add fn method to private collection methods{}
     methods[methodName] = fn
@@ -81,6 +80,28 @@ function Chainable (settings) {
       // return the chain object to make method chaining works
       return chain
     }
+  }
+
+  // chain a custom function
+  // params will be passed to custom function by this structure:
+  // .then(function (p1, p2, done) { }, val1, val2)
+  chain.then = function (fn, ...params) {
+    // check if fn is an async function
+    if (typeof fn !== 'function') throw new Error('First argument must be an async function')
+    asyncFnCheck(fn)
+
+    var args = []
+    for (var arg in arguments) {
+      if (arg > 0 && arguments.hasOwnProperty(arg)) {
+        args[args.length] = arguments[arg]
+      }
+    }
+
+    queueTask(function (done) {
+      args[args.length] = done
+      fn.apply(chain, args)
+    })
+    return chain
   }
 
   // queue tasks created from public method calls
@@ -123,4 +144,28 @@ function Chainable (settings) {
       else if (typeof done === 'function') done(errors, results)
     })
   }
+}
+
+/**
+ * Check if fn is an async function
+ * - has atleast one parameter
+ * - call the callback function
+ *
+ * @param {Function} fn
+ */
+function asyncFnCheck (fn) {
+  var src = fn.toString().replace(/\/\/.*/g, '')
+  var params
+  try {
+    params = src.match(/^function[^(]*\(([^)]*)\)/)[1].replace(/\s+/g, '').split(',')
+  } catch (error) {
+    throw error
+  }
+
+  if (params[0] === '') throw new Error('There is no callback in this function\n\n' + fn.toString())
+
+  var lastparam = params[params.length - 1]
+  var cb = new RegExp(lastparam + '\\s*\\(')
+  if (cb.test(src)) return true
+  else throw new Error(lastparam + ' should be a callback, but is not called anywhere inside this function\n\n' + fn.toString())
 }
