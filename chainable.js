@@ -1,89 +1,126 @@
-var async = require('./async.js')
-
 module.exports = Chainable
 
 /**
- * Create an object with chainable API calls
+ * An object with chainable methods
  *
- * @param {Object} settings
- *
- * settings = {
- *  manualExec: false
- * }
+ * @param {Object} settings { manualExec: boolean, chainable: 'chainable' }
  */
-function Chainable (config) {
+function Chainable (settings) {
   var chain = this
-  var settings = config || {}
+  var cfg = settings || {}
 
-  // private collection of APIs
-  var api = {}
+  var errors = [] // errors from chained methods call
+  var results = [] // results from chained methods call
 
-  // add a chainable api
+  var api = cfg.chainable || 'chainable'
+
+  var chainable = chain[api] = {
+    settings: cfg,
+
+    errors: function () {
+      return errors
+    },
+
+    lastError: function () {
+      return errors[errors.length - 1]
+    },
+
+    results: function () {
+      return results
+    },
+
+    lastResult: function () {
+      return results[results.length - 1]
+    },
+
+    add: 'fn',
+    exec: 'fn'
+  }
+
+  // private collection of methods
+  var methods = {}
+
+  // add a chainable method
   // fn is an async function with done(err, result) callback
-  chain.$add = function (apiName, fn) {
-    // check if api name is a string
-    if (typeof apiName !== 'string') throw new Error('API name must be a string')
+  chainable.add = function (methodName, fn) {
+    // check if method name is a string
+    if (typeof methodName !== 'string') throw new Error('Method name must be a string')
 
-    // check reserved keywords
-    if (apiName.match(/^\$(add|exec)$/i)) throw new Error('Reserved keyword: ' + apiName)
+    // check reserved keyword
+    if (methodName === api) throw new Error('Reserved keyword: ' + methodName)
 
     // check if fn is a function
     if (typeof fn !== 'function') throw new Error('Second argument must be an async function')
 
     // TODO: check if there's a done() callback inside fn()
 
-    // add fn api to private collection api{}
-    api[apiName] = fn
+    // add fn method to private collection methods{}
+    methods[methodName] = fn
 
-    // create a public api call
-    createPublicAPI(apiName)
+    // create a public method call
+    createPublicMethod(methodName)
   }
 
-  // create a public chainable api
-  var createPublicAPI = function (apiName) {
-    chain[apiName] = function (...params) {
-      // prepare args[] to apply to real api[apiName]
+  // create a public chainable method
+  var createPublicMethod = function (methodName) {
+    chain[methodName] = function (...params) {
+      // prepare args[] to apply to real methods[methodName]
       var args = []
       for (var arg in arguments) {
         if (arguments.hasOwnProperty(arg)) {
           args[args.length] = arguments[arg]
         }
       }
-      // queue the api call
-      queueTasks(function (done) {
-        // args will be [...params, done]
+      // queue the method call
+      queueTask(function (done) {
+        // args = [...params, done]
         args[args.length] = done
-        // will call fn api[name](...params, done), binding the chain object context
-        api[apiName].apply(chain, args)
+        // call method(...params, done)
+        methods[methodName].apply(chain, args)
       })
-      // return chain object to make api chaining works
+      // return the chain object to make method chaining works
       return chain
     }
   }
 
-  // queue tasks that are created from public api calls
+  // queue tasks created from public method calls
   var executing
   var tasks = []
-  var queueTasks = function (fn) {
+
+  var queueTask = function (fn) {
     tasks[tasks.length] = fn
-    if (!settings.manualExec && !executing) breakchain()
+    if (!chainable.settings.manualExec && !executing) breakchain()
+  }
+
+  // manually execute queued tasks
+  chainable.exec = function (done) {
+    if (!chainable.settings.manualExec) done('manualExec is set to false')
+    else breakchain(done)
   }
 
   // break the chain
   var breakchain = function (done) {
     if (!executing) {
       executing = true
-      async.cometSeries(tasks, function alldone (err, results) {
-        executing = false
-        if (typeof done === 'function') done(err, results)
-      })
-    } else if (typeof done === 'function') {
+      errors = []
+      results = []
+      exec(done)
+    }/*  else if (typeof done === 'function') {
       done('Executing...')
-    }
+    } */
   }
 
-  // manually execute queued api calls
-  chain.$exec = function (done) {
-    breakchain(done)
+  // execute tasks[0](), then slice item [0], loop until tasks[] empty or an err returned
+  var exec = function (done) {
+    tasks[0](function (err, result) {
+      errors[errors.length] = err
+      results[results.length] = result
+
+      if (err) tasks = []
+      else tasks.splice(0, 1)
+
+      if (!err && tasks.length > 0) exec(done)
+      else if (typeof done === 'function') done(errors, results)
+    })
   }
 }
