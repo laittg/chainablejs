@@ -1,8 +1,7 @@
 const Chainable = require('../chainable.js')
 
 var myApi = new Chainable({
-  manualExec: false,
-  chainable: 'chains'
+  manualExec: true
 })
 
 // async function
@@ -33,13 +32,19 @@ myApi
       console.log(name, age, location)
       done(null, {message: 'this is then', id: [10010, 11323, 19338]})
     }, 1500)
-  }, 'New', 10010, 'York')
+  }, ['New', 10010, 'York'])
   .then(function (done) {
+    console.log('THEN')
     console.log(myApi.chains.errors())
     console.log(myApi.chains.results())
-    console.log('// myApi', myApi)
     done()
   })
-  .chains.repeatIf(function (p) {
-    return true
-  }, 1)
+  .chains.exec(function (errors, results) {
+    console.log('EXEC DONE')
+    console.log(errors)
+    console.log(results)
+    console.log('// myApi', myApi)
+  })
+  // .chains.repeatIf(function (p) {
+  //   return true
+  // }, 1)

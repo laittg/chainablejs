@@ -3,7 +3,7 @@ module.exports = Chainable
 /**
  * An object with chainable methods
  *
- * @param {Object} settings { manualExec: boolean, chainable: 'chainable' }
+ * @param {Object} settings { manualExec: boolean, apiName: 'chains' }
  */
 function Chainable (settings) {
   var chain = this
@@ -12,7 +12,7 @@ function Chainable (settings) {
   var errors = [] // errors from chained methods call
   var results = [] // results from chained methods call
 
-  var api = cfg.chainable || 'chainable'
+  var api = cfg.apiName || 'chains'
 
   var chainable = chain[api] = {
     settings: cfg,
@@ -84,19 +84,14 @@ function Chainable (settings) {
 
   // chain a custom function
   // params will be passed to custom function by this structure:
-  // .then(function (p1, p2, done) { }, val1, val2)
-  chain.then = function (fn, ...params) {
+  // .then(function (p1, p2, done) { ... }, [p1, p2])
+  chain.then = function (fn, params) {
     // check if fn is an async function
     if (typeof fn !== 'function') throw new Error('First argument must be an async function')
     asyncFnCheck(fn)
 
-    var args = []
-    for (var arg in arguments) {
-      if (arg > 0 && arguments.hasOwnProperty(arg)) {
-        args[args.length] = arguments[arg]
-      }
-    }
-
+    // queue the custom function call
+    var args = params || []
     queueTask(function (done) {
       args[args.length] = done
       fn.apply(chain, args)
@@ -115,8 +110,8 @@ function Chainable (settings) {
 
   // manually execute queued tasks
   chainable.exec = function (done) {
-    if (!chainable.settings.manualExec) done('manualExec is set to false')
-    else breakchain(done)
+    if (chainable.settings.manualExec) breakchain(done)
+    else if (typeof done === 'function') done(new Error('manualExec is set to false'))
   }
 
   // break the chain
@@ -127,7 +122,7 @@ function Chainable (settings) {
       results = []
       exec(done)
     } else if (typeof done === 'function') {
-      done('Executing...')
+      done(new Error('Chain functions are executing...'))
     }
   }
 
@@ -166,10 +161,10 @@ function asyncFnCheck (fn) {
     throw error
   }
 
-  if (params[0] === '') throw new Error('There is no callback in this function\n\n' + fn.toString())
+  if (params[0] === '') throw new Error('There is no callback in the function below\n\n' + fn.toString())
 
   var lastparam = params[params.length - 1]
   var cb = new RegExp(lastparam + '\\s*\\(')
   if (cb.test(src)) return true
-  else throw new Error(lastparam + ' is expected to be a callback, but is not called anywhere inside this function\n\n' + fn.toString())
+  else throw new Error(lastparam + ' is expected to be a callback, but is not called anywhere inside the function below\n\n' + fn.toString())
 }
