@@ -3,158 +3,129 @@ module.exports = Chainable
 /**
  * An object with chainable methods
  *
- * @param {Object} settings { manualExec: boolean, apiName: 'chains' }
+ * @param {Object} settings - { api: 'chains' }
  */
 function Chainable (settings) {
-  var chain = this
-  var cfg = settings || {}
+  var chainable = this
 
-  var errors = [] // errors from chained methods call
+  var methods = {} // private collection of method functions
+  var tasks = [] // queue of tasks created from chainable method calls;
+                 // tasks will call real functions in methods {}
   var results = [] // results from chained methods call
+  var executing // chain execution status
 
-  var api = cfg.apiName || 'chains'
-
-  var chainable = chain[api] = {
-    settings: cfg,
-
-    errors: function () {
-      return errors
-    },
-
-    lastError: function () {
-      return errors[errors.length - 1]
-    },
-
-    results: function () {
-      return results
-    },
-
-    lastResult: function () {
-      return results[results.length - 1]
-    },
+  // chainable api properties and methods
+  var api = (settings && settings.api) ? settings.api : 'chains'
+  var chains = chainable[api] = {
+    results: function () { return results },
+    lastResult: function () { return results[results.length - 1] },
+    clearResults: function () { results = [] },
 
     chainable: 'fn',
-    exec: 'fn'
+    exec: 'fn',
+    parent: 'fn',
+
+    onError: 'fn',
+    catch: 'fn',
+
+    onFinished: 'fn',
+    done: 'fn'
   }
 
-  // private collection of methods
-  var methods = {}
+  /**
+   * Api to register a chainable method,
+   * fn is an async function with done(err, result) callback
+   */
+  chains.chainable = function (methodName, fn) {
+    // validate method name and fn async function
+    validateMethod(methodName, api)
+    checkAsync(fn)
 
-  // register a chainable method
-  // fn is an async function with done(err, result) callback
-  chainable.chainable = function (methodName, fn) {
-    // check if method name is a string
-    if (typeof methodName !== 'string') throw new Error('Method name must be a string')
+    // create a chainable method
+    chainableMethod.call(chainable, api, methodName, fn, methods, tasks)
 
-    // check reserved keyword
-    if (methodName === api || methodName === 'then') throw new Error('Reserved keyword: ' + methodName)
+    // enable usage of .chainable().chainable()
+    return this
+  }
 
-    // check if fn is an async function
-    if (typeof fn !== 'function') throw new Error('Second argument must be an async function')
-    asyncFnCheck(fn)
+  /**
+   * Execute the chain of queued methods
+   */
+  chains.exec = function () {
+    if (executing) return
+    executing = true
+    results = []
+    exec.call(this, tasks, results)
+  }
 
-    // add fn method to private collection methods{}
-    methods[methodName] = fn
-
-    // create a public method call
-    createPublicMethod(methodName)
-
+  /**
+   * Returns access to parent chainable object when working with chains api
+   */
+  chains.parent = function () {
     return chainable
   }
 
-  // create a public chainable method
-  var createPublicMethod = function (methodName) {
-    chain[methodName] = function (...params) {
-      // prepare args[] to apply to real methods[methodName]
-      var args = []
-      for (var arg in arguments) {
-        if (arguments.hasOwnProperty(arg)) {
-          args[args.length] = arguments[arg]
-        }
-      }
-      // queue the method call
-      queueTask(function (done) {
-        // args = [...params, done]
-        args[args.length] = done
-        // call method(...params, done)
-        methods[methodName].apply(chain, args)
-      })
-      // return the chain object to make method chaining works
-      return chain
-    }
+  /**
+   * Handle chains execution error
+   * Usage: chainable.chains.catch(function (err, results) {})
+   */
+  chains.catch = function (fn) {
+    if (typeof fn === 'function') chains.onError = fn
+    else throw new Error('Error handler is not a function: ' + fn)
+    return this
   }
 
-  // chain a custom function
-  // params will be passed to custom function by this structure:
-  // .then(function (p1, p2, done) { ... }, [p1, p2])
-  chain.then = function (fn, params) {
+  /**
+   * Handle when chains execution finished successfully
+   * Usage: chainable.chains.done(function (results) {})
+   */
+  chains.done = function (fn) {
+    if (typeof fn === 'function') chains.onFinished = fn
+    else throw new Error('Done handler is not a function: ' + fn)
+    return this
+  }
+
+  /**
+   * Api to chain a custom function fn
+   * params will be passed to fn by this structure:
+   * .then(
+   *   function (p1, p2, p3, done) {
+   *     done(err, result)
+   *   },
+   *   [p1, p2, p3]
+   * )
+   */
+  chainable.then = function (fn, params) {
     // check if fn is an async function
-    if (typeof fn !== 'function') throw new Error('First argument must be an async function')
-    asyncFnCheck(fn)
+    checkAsync(fn)
 
     // queue the custom function call
     var args = params || []
-    queueTask(function (done) {
+    tasks[tasks.length] = function (done) {
       args[args.length] = done
-      fn.apply(chain, args)
-    })
-    return chain
-  }
-
-  // queue tasks created from public method calls
-  var executing
-  var tasks = []
-
-  var queueTask = function (fn) {
-    tasks[tasks.length] = fn
-    if (!chainable.settings.manualExec && !executing) breakchain()
-  }
-
-  // manually execute queued tasks
-  chainable.exec = function (done) {
-    if (chainable.settings.manualExec) breakchain(done)
-    else if (typeof done === 'function') done(new Error('manualExec is set to false'))
-  }
-
-  // break the chain
-  var breakchain = function (done) {
-    if (!executing) {
-      executing = true
-      errors = []
-      results = []
-      exec(done)
-    } else if (typeof done === 'function') {
-      done(new Error('Chain functions are executing...'))
+      fn.apply(chainable, args)
     }
-  }
 
-  // execute tasks[0](), then slice item [0], loop until tasks[] empty or an err returned
-  var exec = function (done) {
-    tasks[0](function (err, result) {
-      errors[errors.length] = err
-      results[results.length] = result
+    // invoke chains execution
+    chains.exec()
 
-      if (err) tasks = []
-      else tasks.splice(0, 1)
-
-      if (!err && tasks.length > 0) {
-        exec(done)
-      } else {
-        executing = false
-        if (typeof done === 'function') done(errors, results)
-      }
-    })
+    return this
   }
 }
 
+// HELPERS
+// =======================================================================
+
 /**
  * Check if fn is an async function
- * - has atleast one parameter
- * - call the callback function
+ * - should has at least one parameter which is a callback function
+ * - should call the callback function
  *
  * @param {Function} fn
  */
-function asyncFnCheck (fn) {
+function checkAsync (fn) {
+  if (typeof fn !== 'function') throw new Error('Not a function: ' + fn)
+
   var src = fn.toString().replace(/\/\/.*/g, '')
   var params
   try {
@@ -162,11 +133,98 @@ function asyncFnCheck (fn) {
   } catch (error) {
     throw error
   }
-
   if (params[0] === '') throw new Error('There is no callback in the function below\n\n' + fn.toString())
 
   var lastparam = params[params.length - 1]
   var cb = new RegExp(lastparam + '\\s*\\(')
-  if (cb.test(src)) return true
-  else throw new Error(lastparam + ' is expected to be a callback, but is not called anywhere inside the function below\n\n' + fn.toString())
+  if (!cb.test(src)) throw new Error(lastparam + ' is expected to be a callback, but it is not called anywhere inside the function below\n\n' + fn.toString())
+}
+
+/**
+ * Create a chainable method
+ *
+ * @param {string} api - chainable api name (e.g. chains)
+ * @param {string} methodName - name of new chainable method
+ * @param {Function} fn - method function
+ * @param {Object} methods - private methods collection of a chainable object
+ * @param {Array} tasks - private tasks queue of a chainable object
+ */
+function chainableMethod (api, methodName, fn, methods, tasks) {
+  var chainable = this
+
+  // add fn method to private collection methods{}
+  methods[methodName] = fn
+
+  // create a public method call
+  chainable[methodName] = function (...params) {
+    var args = [] // prepare args[] to apply to real methods[methodName]
+    for (var arg in arguments) {
+      if (arguments.hasOwnProperty(arg)) {
+        args[args.length] = arguments[arg]
+      }
+    }
+    // queue the method call
+    tasks[tasks.length] = function (done) {
+      args[args.length] = done // args = [...params, done]
+      methods[methodName].apply(chainable, args) // call method(...params, done)
+    }
+    chainable[api].exec()
+    // return the chain object to make method chaining works
+    return chainable
+  }
+}
+
+/**
+ * Validate a chainable method name
+ *
+ * @param {string} methodName - new chainable method name
+ * @param {string} api - chainable object's api name (e.g. chains)
+ */
+function validateMethod (methodName, api) {
+  // check if method name is a string
+  if (typeof methodName !== 'string') throw new Error('Method name must be a string')
+  // check reserved keyword
+  if (methodName === api || methodName.match(/^then$/)) throw new Error('Reserved keyword: ' + methodName)
+}
+
+/**
+ * Execute queued tasks[0]
+ * - then slice item 0
+ * - loop until tasks[] empty or an err returned
+ *
+ * @param {Array} tasks - queued tasks
+ * @param {Array} results - tasks' results
+ */
+function exec (tasks, results) {
+  var chains = this
+
+  // tasks' done callback
+  var done = function (err, result) {
+    if (result !== undefined) results[results.length] = result
+    if (err) {
+      tasks = [] // nothing more to do
+      if (typeof chains.onError !== 'function') throw new Error(err) // application's error handler is expected
+      chains.onError(err, results)
+      chains.clearResults()
+    } else {
+      tasks.splice(0, 1)
+      if (tasks.length > 0) {
+        _exec()
+      } else if (typeof chains.onFinished === 'function') {
+        chains.onFinished(results)
+        chains.clearResults()
+      }
+    }
+  }
+
+  // tasks runner
+  var _exec = function () {
+    try {
+      tasks[0](done)
+    } catch (error) {
+      throw error
+    }
+  }
+
+  _exec()
 }

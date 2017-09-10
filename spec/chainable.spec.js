@@ -1,50 +1,52 @@
 const Chainable = require('../chainable.js')
 
-var myApi = new Chainable({
-  manualExec: true
-})
-
-// async function
-myApi.chains
-.chainable('think', function (topic, time, done) {
-  console.log('Thinking about', topic, '...')
-  setTimeout(function () {
-    console.log(topic, 'cleared.')
-    done(null, new Date()) // err, result
-  }, time)
-})
-.chainable('study', function (topic, time, done) {
-  console.log('Studying', topic, '...')
-  setTimeout(function () {
-    console.log(topic, 'mastered.')
-    done(null, new Date()) // err, result
-  }, time)
-})
+var myApi = new Chainable()
 
 myApi
+  .chains
+    .chainable('think', function (topic, time, done) {
+      console.log('Thinking about', topic, '...')
+      setTimeout(function () {
+        console.log(topic, 'cleared.')
+        done(null, new Date()) // err, result
+      }, time)
+    })
+    .chainable('study', function (topic, time, done) {
+      console.log('Studying', topic, '...')
+      setTimeout(function () {
+        console.log(topic, 'mastered.')
+        done(null, new Date()) // err, result
+      }, time)
+    })
+    .parent()
+
   .think('AI', 500)
-  .study('AI', 1000)
-  .think('Big Data', 500)
-  .study('Big Data', 1000)
+  .study('AI', 700)
+  .think('Big Data', 900)
+  .study('Big Data', 600)
   .then(function (name, age, location, done) {
     setTimeout(function () {
       console.log(myApi.chains.lastResult())
       console.log(name, age, location)
       done(null, {message: 'this is then', id: [10010, 11323, 19338]})
-    }, 1500)
+    }, 900)
   }, ['New', 10010, 'York'])
   .then(function (done) {
     console.log('THEN')
-    console.log(myApi.chains.errors())
     console.log(myApi.chains.results())
     done()
   })
-  .chains.exec(function (errors, results) {
-    console.log('EXEC DONE')
-    console.log(errors)
-    console.log(results)
-    console.log('// myApi', myApi)
-  })
-  // .chains.repeatIf(function (p) {
-  //   return true
-  // }, 1)
+  .chains
+    .catch(function (error, results) {
+      console.log('My Error', error)
+      console.log('My Results', results)
+    })
+    .done(function (results) {
+      console.log('All Done')
+      console.log(myApi)
+    })
+
+setTimeout(function () {
+  console.log('CHECK RESULTS 2')
+  console.log(myApi.chains.results())
+}, 7000)
