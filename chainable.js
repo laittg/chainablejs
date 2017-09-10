@@ -58,6 +58,8 @@ function Chainable (settings) {
 
     // create a public method call
     createPublicMethod(methodName)
+
+    return chainable
   }
 
   // create a public chainable method
