@@ -33,16 +33,16 @@ function Chainable (settings) {
       return results[results.length - 1]
     },
 
-    add: 'fn',
+    chainable: 'fn',
     exec: 'fn'
   }
 
   // private collection of methods
   var methods = {}
 
-  // add a chainable method
+  // register a chainable method
   // fn is an async function with done(err, result) callback
-  chainable.add = function (methodName, fn) {
+  chainable.chainable = function (methodName, fn) {
     // check if method name is a string
     if (typeof methodName !== 'string') throw new Error('Method name must be a string')
 

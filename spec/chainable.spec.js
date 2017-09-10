@@ -5,7 +5,7 @@ var myApi = new Chainable({
 })
 
 // async function
-myApi.chains.add('think', function (topic, time, done) {
+myApi.chains.chainable('think', function (topic, time, done) {
   console.log('Thinking about', topic, '...')
   setTimeout(function () {
     console.log(topic, 'cleared.')
@@ -13,7 +13,7 @@ myApi.chains.add('think', function (topic, time, done) {
   }, time)
 })
 
-myApi.chains.add('study', function (topic, time, done) {
+myApi.chains.chainable('study', function (topic, time, done) {
   console.log('Studying', topic, '...')
   setTimeout(function () {
     console.log(topic, 'mastered.')
