@@ -22,18 +22,13 @@ function Chainable (apiName) {
   // chainable api properties and methods
   var chains = chainable[api] = {
     results: function () { return results },
+    addResult: function (r) { results[results.length] = r },
     lastResult: function () { return results[results.length - 1] },
     clearResults: function () { results = [] },
-    addResult: function (r) { results[results.length] = r },
 
-    runTask: function (splice, done) {
-      if (splice) tasks.splice(0, 1)
-      if (tasks.length === 0) return false
-      tasks[0](done)
-      return true
-    },
-    clearTasks: function () { tasks = [] },
+    runTask: 'fn',
     queueTask: 'fn',
+    clearTasks: function () { tasks = [] },
 
     chainable: 'fn',
     exec: 'fn',
@@ -48,18 +43,26 @@ function Chainable (apiName) {
   }
 
   /**
+   * Run the first queued task with a done() callback.
+   * Splice the [0] task if splice === true
+   */
+  chains.runTask = function (splice, done) {
+    if (splice) tasks.splice(0, 1)
+    if (tasks.length === 0) return false
+    tasks[0](done)
+    return true
+  }
+
+  /**
    * Queue an async function or a method call with arguments
    */
-  chains.queueTask = function (fn, methodName, args) {
-    var hasfn = fn && fn.constructor === Function
-    var hasmn = methodName && methodName.constructor === String
-    if (!hasfn && !hasmn) throw new Error('Must queue a function or a method')
+  chains.queueTask = function (fnOrMethod, args) {
+    var fn = methods[fnOrMethod] || fnOrMethod
+    if (!fn || fn.constructor !== Function) throw new Error('Must queue a function or a method')
 
     tasks[tasks.length] = function (done) {
-      args[args.length] = done // args = [...params, done]
-      hasfn
-        ? fn.apply(chainable, args)
-        : methods[methodName].apply(chainable, args) // call method(...params, done)
+      args[args.length] = done
+      fn.apply(chainable, args) // fn(...params, done)
     }
 
     chains.exec()
@@ -75,7 +78,7 @@ function Chainable (apiName) {
     if (methodName === api || methodName.match(/^then$/)) throw new Error('Reserved keyword: ' + methodName)
 
     // add fn method to private collection methods{}
-    checkAsync(fn)
+    checkAsync(fn, 'Method', true)
     methods[methodName] = fn
 
     // create a public chainable method
@@ -100,8 +103,8 @@ function Chainable (apiName) {
    * Usage: chainable.chains.catch(function (err, results) {})
    */
   chains.catch = function (fn) {
-    if (fn && fn.constructor === Function) chains.onError = fn
-    else throw new Error('Error handler is not a function: ' + fn)
+    checkAsync(fn, 'Error handler')
+    chains.onError = fn
     return this
   }
 
@@ -110,8 +113,8 @@ function Chainable (apiName) {
    * Usage: chainable.chains.done(function (results) {})
    */
   chains.done = function (fn) {
-    if (fn && fn.constructor === Function) chains.onFinished = fn
-    else throw new Error('Done handler is not a function: ' + fn)
+    checkAsync(fn, 'Done handler')
+    chains.onFinished = fn
     return this
   }
 
@@ -127,30 +130,34 @@ function Chainable (apiName) {
  * Api to chain a custom function fn
  * params will be passed to fn by this structure:
  * .then(
- *   function (p1, p2, p3, done) {
- *     done(err, result)
+ *   function fn (p1, p2, p3, done) {
+ *     done(err, result) // callback is optional for .then
  *   },
  *   [p1, p2, p3]
  *       -OR-
  *    p1, p2, p3
  * )
+ *
+ * Note: if fn(hasOnlyP1, done) and P1 takes an array V1[] as value,
+ * then the calling structure must be: .then(fn, [ V1[] ])
  */
 Chainable.prototype.then = function (fn, params) {
   var chains = this[api]
 
   // check if fn is an async function
-  checkAsync(fn)
+  checkAsync(fn, 'Then handler')
 
   // prepare args[] to apply to real methods[methodName]
   var args = []
   for (var arg in arguments) {
     if (arg > 0) args[args.length] = arguments[arg]
   }
+
   // if params are passed by a single array
   if (args.length === 1 && args[0] && args[0].constructor === Array) args = args[0]
 
   // queue the custom function call
-  chains.queueTask(fn, null, args)
+  chains.queueTask(fn, args)
 
   return this
 }
@@ -181,10 +188,13 @@ function setApiName (apiName) {
  * - should has at least one parameter which is a callback function
  * - should call the callback function
  *
- * @param {Function} fn
+ * @param {Function} fn - an async function (...params, done)
+ * @param {string} desc - description of fn, e.g. Error handler
+ * @param {boolean} checkCallback - set to true to check fn source for callback
  */
-function checkAsync (fn) {
-  if (!fn || fn.constructor !== Function) throw new Error('Not a function: ' + fn)
+function checkAsync (fn, desc, checkCallback) {
+  if (!fn || fn.constructor !== Function) throw new Error(desc + ' is not a function: ' + fn)
+  if (!checkCallback) return
 
   var src = fn.toString().replace(/\/\/.*/g, '')
   var params
@@ -197,7 +207,7 @@ function checkAsync (fn) {
 
   var lastparam = params[params.length - 1]
   var cb = new RegExp(lastparam + '\\s*\\(')
-  if (!cb.test(src)) throw new Error(lastparam + ' is expected to be a callback, but it is not called anywhere inside the function below\n\n' + fn.toString())
+  if (!cb.test(src)) throw new Error(lastparam + ' is not a callback, or is not called anywhere inside the function below\n\n' + fn.toString())
 }
 
 /**
@@ -211,12 +221,10 @@ function chainableMethod (methodName) {
   chainable[methodName] = function (...params) {
     var args = [] // prepare args[] to apply to real methods[methodName]
     for (var arg in arguments) {
-      if (arguments.hasOwnProperty(arg)) {
-        args[args.length] = arguments[arg]
-      }
+      args[args.length] = arguments[arg]
     }
     // queue the method call
-    chains.queueTask(null, methodName, args)
+    chains.queueTask(methodName, args)
     // return the chain object to make method chaining works
     return chainable
   }
