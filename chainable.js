@@ -54,11 +54,14 @@ function Chainable (apiName) {
   }
 
   /**
-   * Queue an async function or a method call with arguments
+   * Queue an async function or a method call with arguments.
+   * By calling internally, fnOrMethod is guaranteed
+   * to be a valid methodName or an async function
    */
   chains.queueTask = function (fnOrMethod, args) {
-    var fn = methods[fnOrMethod] || fnOrMethod
-    if (!fn || fn.constructor !== Function) throw new Error('Must queue a function or a method')
+    var fn = fnOrMethod.constructor === String
+      ? methods[fnOrMethod]
+      : fnOrMethod
 
     tasks[tasks.length] = function (done) {
       args[args.length] = done
