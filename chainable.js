@@ -1,7 +1,6 @@
 module.exports = Chainable
 
-var api = 'chains'
-var initialized = false
+var $chainables = []
 
 /**
  * An object with chainable methods
@@ -10,124 +9,153 @@ var initialized = false
  */
 function Chainable (apiName) {
   var chainable = this
+  var parentId = indexChainable(chainable)
+  chainable[apiName] = new Chains(parentId, apiName)
+}
 
-  setApiName(apiName)
+// CHAINS API
+// =======================================================================
 
-  var methods = {} // private collection of method functions
-  var tasks = [] // queue of tasks created from chainable method calls;
-                 // tasks will call real functions in methods {}
-  var results = [] // results from chained methods call
-  var executing // chain execution status
-
-  // chainable api properties and methods
-  var chains = chainable[api] = {
-    results: function () { return results },
-    addResult: function (r) { results[results.length] = r },
-    lastResult: function () { return results[results.length - 1] },
-    clearResults: function () { results = [] },
-
-    runTask: 'fn',
-    queueTask: 'fn',
-    clearTasks: function () { tasks = [] },
-
-    chainable: 'fn',
-    exec: 'fn',
-
+function Chains (parentId, apiName) {
+  this.private = {
+    parentId: parentId,
+    name: apiName,
+    methods: {}, // private collection of method functions
+    tasks: [], // queue of tasks created from chainable method calls;
+                   // tasks will call real functions in methods {}
+    results: [], // results from chained methods call
+    executing: false, // chain execution status
     onError: 'fn',
-    catch: 'fn',
-
-    onFinished: 'fn',
-    done: 'fn',
-
-    parent: 'fn'
-  }
-
-  /**
-   * Run the first queued task with a done() callback.
-   * Splice the [0] task if splice === true
-   */
-  chains.runTask = function (splice, done) {
-    if (splice) tasks.splice(0, 1)
-    if (tasks.length === 0) return false
-    tasks[0](done)
-    return true
-  }
-
-  /**
-   * Queue an async function or a method call with arguments.
-   * By calling internally, fnOrMethod is guaranteed
-   * to be a valid methodName or an async function
-   */
-  chains.queueTask = function (fnOrMethod, args) {
-    var fn = fnOrMethod.constructor === String
-      ? methods[fnOrMethod]
-      : fnOrMethod
-
-    tasks[tasks.length] = function (done) {
-      args[args.length] = done
-      fn.apply(chainable, args) // fn(...params, done)
-    }
-
-    chains.exec()
-  }
-
-  /**
-   * Api to register a chainable method,
-   * fn is an async function with done(err, result) callback
-   */
-  chains.chainable = function (methodName, fn) {
-    // check if method name is a string and not a reserved keyword
-    if (!methodName || methodName.constructor !== String) throw new Error('Method name must be a string')
-    if (methodName === api || methodName.match(/^then$/)) throw new Error('Reserved keyword: ' + methodName)
-
-    // add fn method to private collection methods{}
-    checkAsync(fn, 'Method', true)
-    methods[methodName] = fn
-
-    // create a public chainable method
-    chainableMethod.call(chainable, methodName)
-
-    // enable usage of .chainable().chainable()
-    return this
-  }
-
-  /**
-   * Execute the chain of queued methods
-   */
-  chains.exec = function () {
-    if (executing) return
-    executing = true
-    results = []
-    exec.call(this)
-  }
-
-  /**
-   * Handle chains execution error
-   * Usage: chainable.chains.catch(function (err, results) {})
-   */
-  chains.catch = function (fn) {
-    checkAsync(fn, 'Error handler')
-    chains.onError = fn
-    return this
-  }
-
-  /**
-   * Handle when chains execution finished successfully
-   * Usage: chainable.chains.done(function (results) {})
-   */
-  chains.done = function (fn) {
-    checkAsync(fn, 'Done handler')
-    chains.onFinished = fn
-    return this
-  }
-
-  /**
-   * Returns access to parent chainable object when working with chains api
-   */
-  chains.parent = function () {
-    return chainable
+    onFinished: 'fn'
   }
 }
+
+/**
+ * Results operations
+ */
+Chains.prototype.results = function () {
+  return this.private.results
+}
+
+Chains.prototype.addResult = function (r) {
+  var results = this.private.results
+  results[results.length] = r
+}
+
+Chains.prototype.lastResult = function () {
+  var results = this.private.results
+  return results[results.length - 1]
+}
+
+Chains.prototype.clearResults = function () {
+  this.private.results = []
+}
+
+/**
+ * Run the first queued task with a done() callback.
+ * Splice the [0] task if splice === true
+ */
+Chains.prototype.runTask = function (splice, done) {
+  var tasks = this.private.tasks
+
+  if (splice) tasks.splice(0, 1)
+  if (tasks.length === 0) return false
+
+  tasks[0](done)
+  return true
+}
+
+/**
+ * Queue an async function or a method call with arguments.
+ * By calling internally, fnOrMethod is guaranteed
+ * to be a valid methodName or an async function
+ * TODO: make this a private function
+ */
+Chains.prototype.queueTask = function (fnOrMethod, args) {
+  var chainable = this.parent()
+  var methods = this.private.methods
+  var tasks = this.private.tasks
+
+  var fn = fnOrMethod.constructor === String
+    ? methods[fnOrMethod]
+    : fnOrMethod
+
+  tasks[tasks.length] = function (done) {
+    args[args.length] = done
+    fn.apply(chainable, args) // fn(...params, done)
+  }
+
+  this.exec()
+}
+
+Chains.prototype.clearTasks = function () {
+  this.private.tasks = []
+}
+
+/**
+ * Api to register a chainable method,
+ * fn is an async function with done(err, result) callback
+ */
+Chains.prototype.chainable = function (methodName, fn) {
+  var chainable = this.parent()
+  var methods = this.private.methods
+
+  // check if method name is a string and not a reserved keyword
+  if (!methodName || methodName.constructor !== String) throw new Error('Method name must be a string')
+  if (methodName === this.name || methodName.match(/^then$/)) throw new Error('Reserved keyword: ' + methodName)
+
+  // add fn method to private collection methods{}
+  checkAsync(fn, 'Method', true)
+  methods[methodName] = fn
+
+  // create a public chainable method
+  chainableMethod.call(chainable, methodName)
+
+  // enable usage of .chainable().chainable()
+  return this
+}
+
+/**
+ * Execute the chain of queued methods
+ */
+Chains.prototype.exec = function () {
+  var chains = this
+  if (chains.private.executing) return
+  chains.private.executing = true
+  chains.private.results = []
+  exec.call(this)
+}
+
+/**
+ * Handle chains execution error
+ * Usage: chainable.chains.catch(function (err, results) {})
+ */
+Chains.prototype.catch = function (fn) {
+  checkAsync(fn, 'Error handler')
+  this.private.onError = fn
+  return this
+}
+
+/**
+ * Handle when chains execution finished successfully
+ * Usage: chainable.chains.done(function (results) {})
+ */
+Chains.prototype.done = function (fn) {
+  checkAsync(fn, 'Done handler')
+  this.private.onFinished = fn
+  return this
+}
+
+/**
+ * Returns access to parent chainable object when working with chains api
+ */
+Chains.prototype.parent = function () {
+  var parentId = this.private.parentId
+  return $chainables[parentId]
+}
+
+// CHAINABLE PROTOTYPE
+// =======================================================================
 
 /**
  * Api to chain a custom function fn
@@ -263,4 +291,10 @@ function exec () {
   }
 
   _exec()
+}
+
+function indexChainable (chainable) {
+  var id = $chainables.length
+  $chainables[id] = chainable
+  return id
 }
