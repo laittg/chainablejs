@@ -226,9 +226,12 @@ function exec (chain) {
 
   // tasks runner; passing chain param for performance optimization
   function _exec (chain) {
-    chain.executing
-      ? chain.tasks.shift()
-      : chain.executing = 1
+    if (chain.executing) {
+      chain.tasks[0] = null
+      chain.tasks.shift()
+    } else {
+      chain.executing = 1
+    }
     if (chain.tasks.length === 0) {
       chain.executing = 0
       return false
