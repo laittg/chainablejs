@@ -1,48 +1,44 @@
-const Chainable = require('../chainable.js')
+var Chainable = require('../chainable.js')
 
-var myApi = new Chainable()
+describe('Chainable', function () {
+  var defaultAPI = {
+    chainable: 'chainable',
+    then: 'then',
+    done: 'done',
+    catch: 'catch',
+    results: 'results',
+    lastResult: 'lastResult'
+  }
 
-myApi
-  .chainable('think', function (topic, time, done) {
-    console.log('Thinking about', topic, '...')
-    setTimeout(function () {
-      console.log(topic, 'cleared.')
-      done(null, new Date()) // err, result
-    }, time)
-  })
-  .chainable('study', function (topic, time, done) {
-    console.log('Studying', topic, '...')
-    setTimeout(function () {
-      console.log(topic, 'mastered.')
-      done(null, new Date()) // err, result
-    }, time)
-  })
+  var customAPI = {
+    chainable: 'add',
+    then: 'do',
+    done: 'done',
+    catch: 'catch',
+    results: 'getResults',
+    lastResult: 'getLastResult'
+  }
 
-  .think('AI', 500)
-  .study('AI', 700)
-  .think('Big Data', 900)
-  .study('Big Data', 600)
-  .then(function (name, age, location, done) {
-    setTimeout(function () {
-      console.log(myApi.lastResult())
-      console.log(name, age, location)
-      done(null, {message: 'this is then', id: [10010, 11323, 19338]})
-    }, 900)
-  }, ['New', 10010, 'York'])
-  .then(function (arr, done) {
-    console.log('THEN', arr)
-    console.log(myApi.results())
-    done()
-  }, [[11, 12, 13]])
-  .catch(function (error, results) {
-    console.log('My Error', error)
-    console.log('My Results', results)
-  })
-  .done(function (results) {
-    console.log('All Done')
+  describe('Initialize', function () {
+    it('create a new Chainable with default settings', function () {
+      var chain = new Chainable()
+      expect(chain.__chainable__.api).toEqual(defaultAPI)
+    })
+
+    it('modify an existing object', function () {
+      var myObj = {}
+      Chainable.call(myObj, customAPI)
+      expect(myObj.__chainable__.api).toEqual(customAPI)
+      expect(myObj[customAPI.chainable]).toEqual(jasmine.any(Function))
+    })
   })
 
-setTimeout(function () {
-  console.log('CHECK RESULTS 2')
-  console.log(myApi)
-}, 7000)
+  describe('.chainable()', function () {
+    it('throw error if there\'s no callback', function () {
+      var chain = new Chainable()
+      function thinker () {}
+      expect(chain.chainable('think', thinker)).toThrowError('')
+      expect(chain.chainable('think', function (done) {})).toThrowError()
+    })
+  })
+})
