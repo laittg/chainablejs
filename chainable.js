@@ -3,10 +3,12 @@ module.exports = Chainable
 /**
  * An object with chainable methods
  *
- * @param {Object} api - api names (optional)
+ * @param {Boolean} checkCallback - set to false to skip callback checking
+ *                                when adding new chainable methods
+ * @param {Object} customAPI - api names (optional)
  */
-function Chainable (api) {
-  var _api = {
+function Chainable (checkCallback, customAPI) {
+  var defaultAPI = {
     chainable: 'chainable',
     then: 'then',
     done: 'done',
@@ -15,27 +17,32 @@ function Chainable (api) {
     lastResult: 'lastResult'
   }
 
+  // handle usage of Chainable(customAPI)
+  if (checkCallback && checkCallback.constructor === Object) customAPI = checkCallback
+
   // private variables
   this.__chainable__ = {
-    api: _api,
+    api: defaultAPI,
     methods: {}, // private collection of method functions
     tasks: [], // queue of tasks created from chainable method calls
               // tasks will call real functions in methods {}
     results: [], // results from chained methods call
-    executing: false, // chain execution status
+    executing: 0, // chain execution status
     onError: 'fn', // error handler
-    onFinished: 'fn' // done handler
+    onFinished: 'fn', // done handler
+    checkCallback: (checkCallback !== false && checkCallback !== 0) ? 1 : 0
   }
 
+  if ((this instanceof Chainable)) return
+
   // extend existing object
-  if (!(this instanceof Chainable)) {
-    api = api || {}
-    for (var key in _api) {
-      if (api.hasOwnProperty(key) && api[key] && api[key].constructor === String) {
-        _api[key] = api[key] // e.g manual set .controller() instead of .chainable()
-      }
-      this[_api[key]] = Chainable.prototype[key]
+  customAPI = customAPI || {}
+  for (var key in defaultAPI) {
+    if (customAPI.hasOwnProperty(key) && customAPI[key].constructor === String) {
+      defaultAPI[key] = customAPI[key]
     }
+    // alias the api key to prototype function
+    this[defaultAPI[key]] = Chainable.prototype[key]
   }
 }
 
@@ -45,15 +52,22 @@ function Chainable (api) {
 Chainable.prototype.chainable = function (method, fn) {
   // check if method name is a string and not a reserved keyword
   if (!method || method.constructor !== String) throw new Error('Method name must be a string')
-  if (this.__chainable__.api.hasOwnProperty(method)) throw new Error('Reserved keyword: ' + method)
+  if (this[method]) throw new Error('Duplicated method name: ' + method)
+
+  // check if fn is an async function
+  checkAsync(fn, 'Method', this.__chainable__.checkCallback)
 
   // add fn method to private collection methods{}
-  checkAsync(fn, 'Method', true)
   this.__chainable__.methods[method] = fn
 
   // create a public chainable method
-  this[method] = function (...params) {
-    queueTask(this, this.__chainable__.methods[method], arguments) // queue the method call
+  this[method] = function () {
+    var args = []
+    var l = arguments.length
+    for (var i = 0; i < l; i++) {
+      args[i] = arguments[i]
+    }
+    queueTask(this, this.__chainable__.methods[method], args) // queue the method call
     return this // enable methods chaining .methodA().methodB()
   }
 
@@ -80,18 +94,17 @@ Chainable.prototype.then = function (fn) {
   checkAsync(fn, 'Then handler')
 
   // prepare args[] to apply to real methods[methodName]
-  var args, i
+  var args, i, l
 
   if (arguments.length === 2 && arguments[1] && arguments[1].constructor === Array) {
     // calling .then( fn(p1, p2, p3, done), [v1, v2, v3] )
     args = arguments[1]
-    // if fn has only one param and it takes an array
-    //   call .then( fn(p1, done), [ [v1.1, v1.2, v1.3] ])
   } else {
     // calling .then( fn(p1, p2, p3, done), v1, v2, v3)
     args = []
-    for (i = 1; i < arguments.length; i++) {
-      args[i - 1] = arguments[i]
+    l = arguments.length
+    for (i = 1; i < l; i++) {
+      args[i] = arguments[i]
     }
   }
 
@@ -199,7 +212,7 @@ function exec (chain) {
       chain.onError(err, chain.results)
       chain.tasks = [] // nothing more to do
       chain.results = []
-      chain.executing = false
+      chain.executing = 0
     } else if (_exec(chain)) {
       // has tasks to run, do nothing here
     } else if (chain.onFinished.constructor === Function) {
@@ -215,9 +228,9 @@ function exec (chain) {
   function _exec (chain) {
     chain.executing
       ? chain.tasks.shift()
-      : chain.executing = true
+      : chain.executing = 1
     if (chain.tasks.length === 0) {
-      chain.executing = false
+      chain.executing = 0
       return false
     } else {
       chain.tasks[0](_done)
