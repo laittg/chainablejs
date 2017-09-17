@@ -25,6 +25,7 @@ function Chainable (checkCallback, customAPI) {
               // tasks will call real functions in methods {}
     results: [], // results from chained methods call
     executing: 0, // chain execution status
+    error: null,
     onError: 'fn', // error handler
     onFinished: 'fn', // done handler
     checkCallback: (checkCallback !== false && checkCallback !== 0) ? 1 : 0
@@ -119,7 +120,13 @@ Chainable.prototype.then = function (fn) {
  */
 Chainable.prototype.done = function (fn) {
   checkAsync(fn, 'Done handler')
-  this.__chainable__.onFinished = fn
+  var chain = this.__chainable__
+  chain.onFinished = fn
+  // when .done() is called at the end of the chain
+  if (chain.error === null && chain.executing === 0 && chain.results.length > 0) {
+    chain.onFinished(chain.results)
+    chain.results = []
+  }
   return this
 }
 
@@ -129,7 +136,14 @@ Chainable.prototype.done = function (fn) {
  */
 Chainable.prototype.catch = function (fn) {
   checkAsync(fn, 'Error handler')
-  this.__chainable__.onError = fn
+  var chain = this.__chainable__
+  chain.onError = fn
+  // when .catch() is called at the end of the chain
+  if (chain.error !== null && chain.executing === 0) {
+    chain.onError(chain.error, chain.results)
+    chain.results = []
+    chain.error = null
+  }
   return this
 }
 
@@ -186,32 +200,44 @@ function checkAsync (fn, desc, checkCallback) {
 function queueTask (chainable, fn, args) {
   var tasks = chainable.__chainable__.tasks
   tasks[tasks.length] = function (done) {
-    args[args.length] = done
-    fn.apply(chainable, args) // fn(...params, done)
+    var error = chainable.__chainable__.error
+    if (error !== null) {
+      done(error)
+    } else {
+      args[args.length] = done
+      fn.apply(chainable, args) // fn(...params, done)
+    }
   }
   // execute tasks
-  if (!chainable.__chainable__.executing) exec(chainable.__chainable__)
+  if (chainable.__chainable__.executing === 0) exec(chainable.__chainable__)
 }
 
 /**
  * Execute the chain of queued methods
  */
 function exec (chain) {
-  if (chain.executing) return
-
-  // chain.results = []
-  // if the chain has no done callback, results will not be cleared
+  if (chain.executing === 0) _exec(chain)
 
   // tasks' done callback
   function _done (err, result) {
+    var i, l
     if (result !== undefined) chain.results[chain.results.length] = result
-    if (err) {
-      // error-first
-      if (chain.onError.constructor !== Function) throw new Error(err) // expect error handler
-      chain.onError(err, chain.results)
-      chain.tasks = [] // nothing more to do
-      chain.results = []
+    if (err !== null) {
+      // clear tasks, stop executing
+      l = chain.tasks.length
+      for (i = 0; i < l; i++) {
+        chain.tasks[i] = null
+      }
+      chain.tasks = []
       chain.executing = 0
+      // call onError, or log the error
+      if (chain.onError.constructor === Function) {
+        chain.onError(err, chain.results)
+        chain.results = []
+        chain.error = null
+      } else {
+        chain.error = err
+      }
     } else if (_exec(chain)) {
       // has tasks to run, do nothing here
     } else if (chain.onFinished.constructor === Function) {
@@ -239,6 +265,4 @@ function exec (chain) {
       return true
     }
   }
-
-  _exec(chain)
 }
