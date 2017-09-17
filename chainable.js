@@ -17,9 +17,6 @@ function Chainable (checkCallback, customAPI) {
     lastResult: 'lastResult'
   }
 
-  // handle usage of Chainable(customAPI)
-  if (checkCallback && checkCallback.constructor === Object) customAPI = checkCallback
-
   // private variables
   this.__chainable__ = {
     api: defaultAPI,
@@ -35,8 +32,10 @@ function Chainable (checkCallback, customAPI) {
 
   if ((this instanceof Chainable)) return
 
+  // handle usage of Chainable(customAPI)
+  if (checkCallback && checkCallback.constructor === Object) customAPI = checkCallback
+  else customAPI = customAPI || {}
   // extend existing object
-  customAPI = customAPI || {}
   for (var key in defaultAPI) {
     if (customAPI.hasOwnProperty(key) && customAPI[key].constructor === String) {
       defaultAPI[key] = customAPI[key]
@@ -104,7 +103,7 @@ Chainable.prototype.then = function (fn) {
     args = []
     l = arguments.length
     for (i = 1; i < l; i++) {
-      args[i] = arguments[i]
+      args[args.length] = arguments[i]
     }
   }
 
