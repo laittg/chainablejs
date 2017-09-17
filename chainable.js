@@ -123,7 +123,7 @@ Chainable.prototype.done = function (fn) {
   var chain = this.__chainable__
   chain.onFinished = fn
   // when .done() is called at the end of the chain
-  if (chain.error === null && chain.executing === 0 && chain.results.length > 0) {
+  if (!chain.error && chain.executing === 0 && chain.results.length > 0) {
     chain.onFinished(chain.results)
     chain.results = []
   }
@@ -139,7 +139,7 @@ Chainable.prototype.catch = function (fn) {
   var chain = this.__chainable__
   chain.onError = fn
   // when .catch() is called at the end of the chain
-  if (chain.error !== null && chain.executing === 0) {
+  if (chain.error && chain.executing === 0) {
     chain.onError(chain.error, chain.results)
     chain.results = []
     chain.error = null
@@ -201,7 +201,7 @@ function queueTask (chainable, fn, args) {
   var tasks = chainable.__chainable__.tasks
   tasks[tasks.length] = function (done) {
     var error = chainable.__chainable__.error
-    if (error !== null) {
+    if (error) {
       done(error)
     } else {
       args[args.length] = done
@@ -219,10 +219,10 @@ function exec (chain) {
   if (chain.executing === 0) _exec(chain)
 
   // tasks' done callback
-  function _done (err, result) {
+  function _done (error, result) {
     var i, l
     if (result !== undefined) chain.results[chain.results.length] = result
-    if (err !== null) {
+    if (error) {
       // clear tasks, stop executing
       l = chain.tasks.length
       for (i = 0; i < l; i++) {
@@ -232,11 +232,11 @@ function exec (chain) {
       chain.executing = 0
       // call onError, or log the error
       if (chain.onError.constructor === Function) {
-        chain.onError(err, chain.results)
+        chain.onError(error, chain.results)
         chain.results = []
         chain.error = null
       } else {
-        chain.error = err
+        chain.error = error
       }
     } else if (_exec(chain)) {
       // has tasks to run, do nothing here

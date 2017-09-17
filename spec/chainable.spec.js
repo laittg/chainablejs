@@ -166,7 +166,7 @@ describe('Chainable', function () {
     })
   })
 
-  xdescribe('Completed flow', function () {
+  describe('Completed flow', function () {
     it('works', function (done) {
       function think (topic, time, next) {
         setTimeout(function () {
@@ -181,18 +181,19 @@ describe('Chainable', function () {
       chain
         .chainable('think', think)
         .chainable('study', study)
+
         .think('AI', 100)
         .then(function (next) {
           expect(chain.lastResult()).toEqual('Mindset cleared on AI')
-          console.log(chain)
           next()
         })
+
         .study('BI', 50)
         .then(function (next) {
           expect(chain.lastResult()).toEqual('Mastered BI')
-          done()
           next()
         })
+
         .then(function (next) {
           expect(chain.results()).toEqual(['Mindset cleared on AI', 'Mastered BI'])
           next()
