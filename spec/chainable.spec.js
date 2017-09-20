@@ -170,7 +170,7 @@ describe('Chainable', function () {
     it('works', function (done) {
       function think (topic, time, next) {
         setTimeout(function () {
-          next(null, 'Mindset cleared on ' + topic)
+          next(null, 'Mindset cleared about ' + topic)
         }, time)
       }
       function study (topic, time, next) {
@@ -184,7 +184,7 @@ describe('Chainable', function () {
 
         .think('AI', 100)
         .then(function (next) {
-          expect(chain.lastResult()).toEqual('Mindset cleared on AI')
+          expect(chain.lastResult()).toEqual('Mindset cleared about AI')
           next()
         })
 
@@ -194,10 +194,32 @@ describe('Chainable', function () {
           next()
         })
 
+        .think('Big Data', 150)
         .then(function (next) {
-          expect(chain.results()).toEqual(['Mindset cleared on AI', 'Mastered BI'])
+          expect(chain.lastResult()).toEqual('Mindset cleared about Big Data')
           next()
         })
+
+        .study('Blockchain', 80)
+        .then(function (next) {
+          expect(chain.lastResult()).toEqual('Mastered Blockchain')
+          next()
+        })
+
+        .then(function (next) {
+          expect(chain.results()).toEqual([
+            'Mindset cleared about AI',
+            'Mastered BI',
+            'Mindset cleared about Big Data',
+            'Mastered Blockchain'])
+          next()
+        })
+
+        .catch(function (error, results) {
+          expect(error).not.toBeNull()
+          expect(results.lenth).toBeGreaterThan(0)
+        })
+
         .done(function () {
           done()
         })

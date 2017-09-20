@@ -36,12 +36,12 @@ function Chainable (checkCallback, customAPI) {
   // handle usage of Chainable(customAPI)
   if (checkCallback && checkCallback.constructor === Object) customAPI = checkCallback
   else customAPI = customAPI || {}
-  // extend existing object
+  // extend existing object if it's not created from 'new Chainable()'
   for (var key in defaultAPI) {
     if (customAPI.hasOwnProperty(key) && customAPI[key].constructor === String) {
       defaultAPI[key] = customAPI[key]
     }
-    // alias the api key to prototype function
+    // alias the api key to Chainable prototype's function
     this[defaultAPI[key]] = Chainable.prototype[key]
   }
 }
@@ -50,7 +50,7 @@ function Chainable (checkCallback, customAPI) {
  * Register a chainable method
  */
 Chainable.prototype.chainable = function (method, fn) {
-  // check if method name is a string and not a reserved keyword
+  // check if method name is a string and not conflict with existing properties name
   if (!method || method.constructor !== String) throw new Error('Method name must be a string')
   if (this[method]) throw new Error('Duplicated method name: ' + method)
 
@@ -172,7 +172,7 @@ Chainable.prototype.lastResult = function () {
  *
  * @param {Function} fn - an async function (...params, done)
  * @param {string} desc - description of fn, e.g. Error handler
- * @param {boolean} checkCallback - set to true to check fn source for callback
+ * @param {boolean} checkCallback - set to true to check the fn's source code for a callback
  */
 function checkAsync (fn, desc, checkCallback) {
   if (!fn || fn.constructor !== Function) throw new Error(desc + ' is not a function: ' + fn)
@@ -195,39 +195,33 @@ function checkAsync (fn, desc, checkCallback) {
 /**
  * Queue an async function or a method call with arguments.
  * By calling internally, fn is guaranteed
- * to be a valid function
+ * to be a valid function. No need to checkAsync() here.
  */
 function queueTask (chainable, fn, args) {
-  var tasks = chainable.__chainable__.tasks
-  tasks[tasks.length] = function (done) {
-    var error = chainable.__chainable__.error
-    if (error) {
-      done(error)
-    } else {
-      args[args.length] = done
-      fn.apply(chainable, args) // fn(...params, done)
-    }
+  var chain = chainable.__chainable__
+  chain.tasks[chain.tasks.length] = function (done) {
+    if (chain.error) return done()
+    args[args.length] = done
+    fn.apply(chainable, args) // fn(...params, done)
   }
   // execute tasks
-  if (chainable.__chainable__.executing === 0) exec(chainable.__chainable__)
+  if (chain.executing === 0) {
+    chain.executing = 1
+    exec(chain)
+  }
 }
 
 /**
  * Execute the chain of queued methods
  */
 function exec (chain) {
-  if (chain.executing === 0) _exec(chain)
+  _exec(chain)
 
   // tasks' done callback
   function _done (error, result) {
-    var i, l
     if (result !== undefined) chain.results[chain.results.length] = result
     if (error) {
       // clear tasks, stop executing
-      l = chain.tasks.length
-      for (i = 0; i < l; i++) {
-        chain.tasks[i] = null
-      }
       chain.tasks = []
       chain.executing = 0
       // call onError, or log the error
@@ -251,18 +245,15 @@ function exec (chain) {
 
   // tasks runner; passing chain param for performance optimization
   function _exec (chain) {
-    if (chain.executing) {
-      chain.tasks[0] = null
-      chain.tasks.shift()
-    } else {
-      chain.executing = 1
-    }
-    if (chain.tasks.length === 0) {
+    var itodo = chain.executing - 1
+    if (itodo > 0) chain.tasks[itodo - 1] = null // clear the previous task
+    if (itodo === chain.tasks.length) { // no more tasks to run
+      chain.tasks = []
       chain.executing = 0
-      return false
     } else {
-      chain.tasks[0](_done)
-      return true
+      chain.executing++
+      chain.tasks[itodo](_done)
     }
+    return chain.executing
   }
 }
