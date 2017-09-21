@@ -1,14 +1,15 @@
 {
-  "name": "chainable",
-  "version": "1.0.0",
-  "description": "Create chainable methods",
+  "name": "chainablejs",
+  "version": "1.0.3",
+  "description": "Sync/Async Chainable Methods",
   "main": "chainable.js",
   "scripts": {
     "test": "jasmine"
   },
   "keywords": [
     "chainable methods",
-    "chainable api"
+    "chainable api",
+    "async"
   ],
   "standard": {
     "env": [
