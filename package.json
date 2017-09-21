@@ -16,5 +16,8 @@
     ]
   },
   "author": "Trung, Lai Thanh @laittg",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "jasmine": "^2.8.0"
+  }
 }
