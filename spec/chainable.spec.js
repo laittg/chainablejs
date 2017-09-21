@@ -42,23 +42,26 @@ describe('Chainable', function () {
   describe('Initialize', function () {
     it('creates a new Chainable with default settings', function () {
       var chain = new Chainable(customAPI) // passing customAPI won't make sense
-      expect(chain.__chainable__.api).toEqual(defaultAPI)
+      var proto = Object.getPrototypeOf(chain)
+      for (var key in defaultAPI) {
+        expect(chain.hasOwnProperty(defaultAPI[key])).toBeFalsy()
+        expect(proto[key].constructor).toEqual(jasmine.any(Function))
+      }
     })
 
     it('modifies an existing object', function () {
-      var myObj = {}
-      Chainable.call(myObj, customAPI) // passing only customAPI should work
-      expect(myObj.__chainable__.api).toEqual(customAPI)
-      expect(myObj[customAPI.chainable].toString()).toEqual(Chainable.prototype.chainable.toString())
+      var chain = {}
+      Chainable.call(chain, customAPI) // passing only customAPI should work
+      for (var key in customAPI) {
+        expect(chain.hasOwnProperty(customAPI[key])).toBeTruthy()
+        expect(chain[customAPI[key]].constructor).toEqual(jasmine.any(Function))
+      }
+      expect(chain[customAPI.chainable].toString()).toEqual(Chainable.prototype.chainable.toString())
     })
   })
 
   describe('.chainable()', function () {
     it('throws errors', function () {
-      expect(function () {
-        chain.chainable({}, f1)
-      }).toThrowError('Method name must be a string')
-
       expect(function () {
         chain.chainable('then', f1)
       }).toThrowError('Duplicated method name: then')
