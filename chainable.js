@@ -81,8 +81,7 @@ Chainable.prototype.chainable = function (method, fn) {
  *   function fn (p1, p2, p3, done) {
  *     done(err, result) // callback is optional for .then
  *   },
- *   [p1, p2, p3]
- *       -OR-
+ *   [p1, p2, p3] -OR-
  *    p1, p2, p3
  * )
  *
@@ -200,7 +199,7 @@ function checkAsync (fn, desc, checkCallback) {
 function queueTask (chainable, fn, args) {
   var chain = chainable.__chainable__
   chain.tasks[chain.tasks.length] = function (done) {
-    if (chain.error) return done()
+    if (chain.error) return done() // defensive: in case previous error wasn't catched
     args[args.length] = done
     fn.apply(chainable, args) // fn(...params, done)
   }
@@ -220,6 +219,7 @@ function exec (chain) {
   // tasks' done callback
   function _done (error, result) {
     if (result !== undefined) chain.results[chain.results.length] = result
+    error = error || chain.error // defensive: in case previous error wasn't catched
     if (error) {
       // clear tasks, stop executing
       chain.tasks = []
