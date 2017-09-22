@@ -5,7 +5,13 @@ node_js:
   - "6"
   - "8"
 
-#after_success: npm run coveralls
+before_install:
+  - npm i -g istanbul
+  - npm i -g codecov
+
+after_success:
+  - npm run istanbul
+  - codecov
 
 script:
   - npm test
