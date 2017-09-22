@@ -1,7 +1,7 @@
 {
   "name": "chainablejs",
-  "version": "1.0.3",
-  "description": "Write Chainable Methods to Avoid Callback Hell in NodeJS / Javascript",
+  "version": "1.0.4",
+  "description": "Write Chainable Methods and Avoid Callback Hell in NodeJS / Javascript",
   "main": "chainable.js",
   "scripts": {
     "test": "jasmine",
