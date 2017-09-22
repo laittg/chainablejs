@@ -1,14 +1,16 @@
 {
-  "name": "chainable",
-  "version": "1.0.0",
-  "description": "Create chainable methods",
+  "name": "chainablejs",
+  "version": "1.0.3",
+  "description": "Write Chainable Methods to Avoid Callback Hell in NodeJS / Javascript",
   "main": "chainable.js",
   "scripts": {
-    "test": "jasmine"
+    "test": "jasmine",
+    "istanbul": "istanbul cover node_modules/jasmine/bin/jasmine.js"
   },
   "keywords": [
-    "chainable methods",
-    "chainable api"
+    "chainable",
+    "callback",
+    "async"
   ],
   "standard": {
     "env": [
