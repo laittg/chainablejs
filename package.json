@@ -1,14 +1,15 @@
 {
   "name": "chainablejs",
-  "version": "1.0.3",
-  "description": "Sync/Async Chainable Methods",
+  "version": "1.0.4",
+  "description": "Write Chainable Methods and Avoid Callback Hell in NodeJS / Javascript",
   "main": "chainable.js",
   "scripts": {
-    "test": "jasmine"
+    "test": "jasmine",
+    "istanbul": "istanbul cover node_modules/jasmine/bin/jasmine.js"
   },
   "keywords": [
-    "chainable methods",
-    "chainable api",
+    "chainable",
+    "callback",
     "async"
   ],
   "standard": {
