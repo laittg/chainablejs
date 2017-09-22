@@ -1,14 +1,14 @@
 {
   "name": "chainablejs",
   "version": "1.0.3",
-  "description": "Sync/Async Chainable Methods",
+  "description": "Avoid Callback Hell with Chainable Methods",
   "main": "chainable.js",
   "scripts": {
     "test": "jasmine"
   },
   "keywords": [
-    "chainable methods",
-    "chainable api",
+    "chainable",
+    "callback",
     "async"
   ],
   "standard": {
