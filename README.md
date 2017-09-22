@@ -1,5 +1,7 @@
 # ChainableJS - Async Chainable Methods
 
+[![Build Status](https://travis-ci.org/laittg/chainablejs.svg?branch=master)](https://travis-ci.org/laittg/chainablejs) [![codecov](https://codecov.io/gh/laittg/chainablejs/branch/master/graph/badge.svg)](https://codecov.io/gh/laittg/chainablejs)
+
 Write Chainable Methods and Avoid Callback Hell in NodeJS / Javascript
 
 ## Example
